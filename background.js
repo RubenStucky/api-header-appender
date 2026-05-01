@@ -65,6 +65,8 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
     // Auto-fetch missing OAuth tokens when navigating to a matching domain
     if (tab.url) {
       await autoFetchTokensForUrl(tab.url);
+      // Update icon again after token fetch (may have changed from pending to active)
+      await updateIcon(tab);
     }
   }
 });
@@ -394,27 +396,47 @@ async function updateIcon(tab) {
   }
 
   const profiles = await getProfiles();
-  const hasMatch = profiles.some(p => {
-    if (!p.enabled) return false;
+  let hasActiveMatch = false;
+  let hasPendingMatch = false;
+
+  for (const p of profiles) {
+    if (!p.enabled) continue;
     try {
       const domain = p.urlPattern.replace(/^https?:\/\//, '').replace(/\/+$/, '').toLowerCase();
       const hostname = new URL(tab.url).hostname.toLowerCase();
-      return hostname === domain || hostname.endsWith('.' + domain);
+      const matches = hostname === domain || hostname.endsWith('.' + domain);
+      if (!matches) continue;
     } catch {
-      return false;
+      continue;
     }
-  });
 
-  await setIconState(hasMatch ? 'active' : 'inactive', tab.id);
+    if (p.type === 'static') {
+      hasActiveMatch = true;
+    } else if (p.type === 'oauth') {
+      const token = await getCachedToken(p.id);
+      if (token) {
+        hasActiveMatch = true;
+      } else {
+        hasPendingMatch = true;
+      }
+    }
+  }
+
+  if (hasActiveMatch) {
+    await setIconState('active', tab.id);
+  } else if (hasPendingMatch) {
+    await setIconState('pending', tab.id);
+  } else {
+    await setIconState('inactive', tab.id);
+  }
 }
 
 async function setIconState(state, tabId) {
-  const suffix = state === 'active' ? 'active' : 'inactive';
   const details = {
     path: {
-      16: `icons/icon-${suffix}-16.png`,
-      48: `icons/icon-${suffix}-48.png`,
-      128: `icons/icon-${suffix}-128.png`,
+      16: `icons/icon-${state}-16.png`,
+      48: `icons/icon-${state}-48.png`,
+      128: `icons/icon-${state}-128.png`,
     },
   };
   if (tabId) details.tabId = tabId;
