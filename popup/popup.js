@@ -116,6 +116,9 @@ async function detectCurrentTab() {
 // ── Profile Rendering ──
 
 async function renderProfiles() {
+  // Preserve scroll position
+  const scrollTop = $profileList.scrollTop;
+
   const profiles = await getProfiles();
 
   // Clear all cards
@@ -167,6 +170,9 @@ async function renderProfiles() {
     const card = await createProfileCard(profile, false);
     $allProfiles.appendChild(card);
   }
+
+  // Restore scroll position
+  $profileList.scrollTop = scrollTop;
 }
 
 async function createProfileCard(profile, isActive) {
@@ -228,11 +234,22 @@ async function createProfileCard(profile, isActive) {
   });
 
   // Delete
-  card.querySelector('[data-action="delete"]').addEventListener('click', async (e) => {
+  const deleteBtn = card.querySelector('[data-action="delete"]');
+  deleteBtn.addEventListener('click', async (e) => {
     e.stopPropagation();
-    if (confirm(`Delete profile "${profile.name || 'Unnamed'}"?`)) {
+    e.preventDefault();
+    if (deleteBtn.classList.contains('confirm-delete')) {
       await deleteProfile(profile.id);
       await renderProfiles();
+    } else {
+      deleteBtn.classList.add('confirm-delete');
+      deleteBtn.innerHTML = `<svg viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg><span class="confirm-label">Confirm delete</span>`;
+      setTimeout(() => {
+        if (deleteBtn.classList.contains('confirm-delete')) {
+          deleteBtn.classList.remove('confirm-delete');
+          deleteBtn.innerHTML = `<svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>`;
+        }
+      }, 3000);
     }
   });
 
