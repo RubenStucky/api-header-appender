@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>API Header Appender</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="container">
+    <header class="header">
+      <h1>API Header Appender</h1>
+      <button id="btn-add" class="btn btn-primary btn-sm" title="Add profile">+ Add</button>
+    </header>
+
+    <!-- Current tab info -->
+    <div id="current-tab" class="current-tab hidden">
+      <span class="tab-icon">●</span>
+      <span id="current-tab-url" class="tab-url"></span>
+    </div>
+
+    <!-- Profile list -->
+    <div id="profile-list" class="profile-list">
+      <div class="empty-state" id="empty-state">
+        <p>No profiles configured.</p>
+        <p class="muted">Click <strong>+ Add</strong> to create one.</p>
+      </div>
+
+      <!-- Active profiles for current tab -->
+      <div id="section-active" class="section-group hidden">
+        <div class="section-label">Active on this page</div>
+        <div id="active-profiles" class="profile-cards"></div>
+      </div>
+
+      <!-- No match notice -->
+      <div id="no-match-notice" class="no-match-notice hidden">
+        <span>No profiles match this page</span>
+      </div>
+
+      <!-- All profiles (collapsible) -->
+      <div id="section-all" class="section-group hidden">
+        <button id="toggle-all-profiles" class="section-toggle">
+          <span class="toggle-arrow" id="toggle-arrow">▸</span>
+          All Profiles (<span id="all-profiles-count">0</span>)
+        </button>
+        <div id="all-profiles-wrapper" class="collapsed">
+          <input type="text" id="search-profiles" class="search-input" placeholder="Search profiles...">
+          <div id="all-profiles" class="profile-cards"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Profile edit form (hidden by default) -->
+    <div id="profile-form" class="profile-form hidden">
+      <h2 id="form-title">Add Profile</h2>
+
+      <div class="form-group">
+        <label for="input-name">Name</label>
+        <input type="text" id="input-name" placeholder="e.g. My API">
+      </div>
+
+      <div class="form-group">
+        <label for="input-url">URL Pattern (domain)</label>
+        <input type="text" id="input-url" placeholder="e.g. api.example.com">
+        <span class="hint">Matches all requests to this domain and subdomains</span>
+      </div>
+
+      <div class="form-group">
+        <label>Type</label>
+        <div class="toggle-group">
+          <button class="toggle-btn active" data-type="static" id="toggle-static">Static Headers</button>
+          <button class="toggle-btn" data-type="oauth" id="toggle-oauth">OAuth Token</button>
+        </div>
+      </div>
+
+      <!-- Static headers section -->
+      <div id="section-static" class="section-fields">
+        <div class="form-group">
+          <label>Headers</label>
+          <div id="headers-list" class="headers-list"></div>
+          <button id="btn-add-header" class="btn btn-link btn-sm">+ Add header</button>
+        </div>
+      </div>
+
+      <!-- OAuth section -->
+      <div id="section-oauth" class="section-fields hidden">
+        <div class="form-group">
+          <label for="input-token-url">Token URL</label>
+          <input type="text" id="input-token-url" placeholder="https://auth.example.com/connect/token">
+        </div>
+        <div class="form-group">
+          <label for="input-client-id">Client ID</label>
+          <input type="text" id="input-client-id" placeholder="client_id">
+        </div>
+        <div class="form-group">
+          <label for="input-client-secret">Client Secret</label>
+          <input type="password" id="input-client-secret" placeholder="client_secret">
+        </div>
+      </div>
+
+      <div class="form-actions">
+        <button id="btn-save" class="btn btn-primary">Save</button>
+        <button id="btn-cancel" class="btn btn-ghost">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="popup.js" type="module"></script>
+</body>
+</html>
