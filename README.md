@@ -88,7 +88,7 @@ All data is stored locally on your machine within Chrome's extension storage. No
 | Data | Storage | Persistence | Notes |
 |---|---|---|---|
 | Profile configs (name, URL pattern, type) | `chrome.storage.local` | Persists across browser restarts | Only accessible to this extension |
-| Client ID & Client Secret | `chrome.storage.local` | Persists across browser restarts | Stored as plaintext — same as ModHeader and similar tools |
+| Client ID & Client Secret | `chrome.storage.local` | Persists across browser restarts | Only accessible to this extension |
 | Access tokens | `chrome.storage.session` | **Cleared on browser close** | Never written to disk long-term |
 | Static header values (API keys) | `chrome.storage.local` | Persists across browser restarts | Applied as dynamic DNR rules |
 | OAuth authorization rules | Session DNR rules | **Cleared on browser close** | Auto-removed when browser shuts down |
@@ -100,7 +100,7 @@ All data is stored locally on your machine within Chrome's extension storage. No
 - Data is **never synced** to your Google account — we use `chrome.storage.local`, not `chrome.storage.sync`
 - This is the same trust model used by ModHeader, Requestly, and similar browser extensions
 
-**Bottom line:** Safe for a personal development tool. If you're handling production secrets, consider rotating credentials regularly.
+**Bottom line:** Safe for a personal development tool.
 
 ## Updating
 
