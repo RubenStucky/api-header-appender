@@ -38,8 +38,8 @@ Chrome extension (Manifest V3) that automatically injects HTTP headers into API 
 3. Select **OAuth Token**
 4. Enter the **Token URL** (e.g. `https://auth.example.com/connect/token`)
 5. Enter **Client ID** and **Client Secret**
-6. Save — the extension fetches a token immediately and sets the `Authorization` header
-7. Tokens are automatically refreshed before expiry
+6. Save — the extension fetches a token immediately when the domain loads and sets the `Authorization` header
+7. Tokens are refreshed after expiry when refreshing the page
 
 ### Profile Management
 
