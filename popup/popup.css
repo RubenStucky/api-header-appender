@@ -249,6 +249,25 @@ html, body {
   background: rgba(239, 68, 68, 0.1);
 }
 
+.btn-icon.confirm-delete {
+  color: var(--danger);
+  background: rgba(239, 68, 68, 0.2);
+  width: auto;
+  padding: 2px 8px;
+  gap: 4px;
+}
+
+.btn-icon.confirm-delete .confirm-label {
+  font-size: 10px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+@keyframes pulse-delete {
+  from { opacity: 0.7; }
+  to { opacity: 1; }
+}
+
 .btn-icon.refresh:hover {
   color: var(--accent);
   background: rgba(59, 130, 246, 0.1);
