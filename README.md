@@ -2,6 +2,8 @@
 
 Chrome extension (Manifest V3) that automatically injects HTTP headers into API requests based on URL patterns. Like ModHeader, but with automatic per-domain switching and built-in OAuth client credentials support.
 
+<img width="512" height="277" alt="image" src="https://github.com/user-attachments/assets/f483ebac-e960-447d-844d-34473838cdb8" />
+
 ## Features
 
 - **Static Headers** — Set custom headers (e.g. `X-Api-Key`, `ApiKey`) that are automatically applied to requests matching a domain pattern
