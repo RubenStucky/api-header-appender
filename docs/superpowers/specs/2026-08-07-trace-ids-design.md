@@ -97,18 +97,28 @@ renaming a header does the same.
 
 ## UI
 
-### Trace IDs screen
+Three homes, split by how often each is touched.
 
-A second icon in the popup header, beside the environments gear, opens it. Three sections:
+### Live IDs — on the profile list
 
-- **Scratch UUID** — a monospace value with cycle and copy buttons, unconnected to any
-  profile. Plus **Use as correlation ID**, which writes it into the active correlation ID.
-- **Active IDs** — the correlation ID and attempt ID, each with its own value, cycle, and
-  copy. Cycling the correlation ID also cycles the attempt ID, since a new trace begins a new
-  attempt. The attempt ID can be cycled on its own.
-- **Header names** — two fields defaulting to `X-Correlation-Id` and `X-Attempt-Id`, with a
-  save button. They live here rather than in Environments because they belong to tracing, and
-  this avoids a third settings screen.
+A compact strip under **Active on this page**, above the matched cards: the correlation ID
+and attempt ID, each with a copy button and a cycle button. Cycling the correlation ID also
+cycles the attempt ID, since a new trace begins a new attempt; the attempt ID can be cycled
+on its own. The strip appears only when a profile matching the current page actually has
+tracing on — otherwise it would show two values with nothing to explain them.
+
+This is where the IDs are used, so this is where they live: the point of showing a UUID at
+all is to copy it into a log search.
+
+### UUID generator — the `#` icon
+
+A scratch UUID with cycle and copy, unconnected to any profile, plus **Use as correlation ID**
+which writes it into the live correlation ID. Purely a tool.
+
+### Settings — the gear
+
+Environments and the tracing header names, both configure-once-and-forget. Editing a single
+environment hides the rest of the screen so that edit is the only thing on it.
 
 ### Profile form
 

@@ -88,12 +88,17 @@ const $scratchUuid = document.getElementById('scratch-uuid');
 const $btnCycleScratch = document.getElementById('btn-cycle-scratch');
 const $btnCopyScratch = document.getElementById('btn-copy-scratch');
 const $btnUseScratch = document.getElementById('btn-use-scratch');
-const $correlationId = document.getElementById('correlation-id');
-const $btnCycleCorrelation = document.getElementById('btn-cycle-correlation');
-const $btnCopyCorrelation = document.getElementById('btn-copy-correlation');
-const $attemptId = document.getElementById('attempt-id');
-const $btnCycleAttempt = document.getElementById('btn-cycle-attempt');
-const $btnCopyAttempt = document.getElementById('btn-copy-attempt');
+
+const $traceStrip = document.getElementById('trace-strip');
+const $stripCorrelation = document.getElementById('strip-correlation');
+const $stripAttempt = document.getElementById('strip-attempt');
+const $btnStripCycleCorrelation = document.getElementById('btn-strip-cycle-correlation');
+const $btnStripCopyCorrelation = document.getElementById('btn-strip-copy-correlation');
+const $btnStripCycleAttempt = document.getElementById('btn-strip-cycle-attempt');
+const $btnStripCopyAttempt = document.getElementById('btn-strip-copy-attempt');
+
+const $environmentsHint = document.getElementById('environments-hint');
+const $tracingSettings = document.getElementById('tracing-settings');
 const $inputCorrelationHeader = document.getElementById('input-correlation-header');
 const $inputAttemptHeader = document.getElementById('input-attempt-header');
 const $btnSaveTracing = document.getElementById('btn-save-tracing');
@@ -150,10 +155,12 @@ function bindEvents() {
   $btnCycleScratch.addEventListener('click', cycleScratchUuid);
   $btnCopyScratch.addEventListener('click', () => copyToClipboard($btnCopyScratch, scratchUuid, $scratchUuid));
   $btnUseScratch.addEventListener('click', useScratchAsCorrelationId);
-  $btnCycleCorrelation.addEventListener('click', cycleCorrelationId);
-  $btnCopyCorrelation.addEventListener('click', () => copyToClipboard($btnCopyCorrelation, traceIds.correlationId, $correlationId));
-  $btnCycleAttempt.addEventListener('click', cycleAttemptId);
-  $btnCopyAttempt.addEventListener('click', () => copyToClipboard($btnCopyAttempt, traceIds.attemptId, $attemptId));
+
+  $btnStripCycleCorrelation.addEventListener('click', cycleCorrelationId);
+  $btnStripCopyCorrelation.addEventListener('click', () => copyToClipboard($btnStripCopyCorrelation, traceIds.correlationId, $stripCorrelation));
+  $btnStripCycleAttempt.addEventListener('click', cycleAttemptId);
+  $btnStripCopyAttempt.addEventListener('click', () => copyToClipboard($btnStripCopyAttempt, traceIds.attemptId, $stripAttempt));
+
   $btnSaveTracing.addEventListener('click', handleSaveTracing);
 
   $btnEnvironments.addEventListener('click', openEnvironments);
@@ -238,6 +245,7 @@ async function renderProfiles() {
   if (matched.length > 0) {
     $sectionActive.classList.remove('hidden');
     $noMatchNotice.classList.add('hidden');
+    await renderTraceStrip(matched.some(p => p.tracing));
     for (const profile of matched) {
       const card = await createProfileCard(profile, true);
       $activeProfiles.appendChild(card);
@@ -260,6 +268,16 @@ async function renderProfiles() {
 
   // Restore scroll position
   $profileList.scrollTop = scrollTop;
+}
+
+// The live IDs sit above the matched cards, but only when a profile matching this
+// page actually sends them — otherwise they are two values with nothing to explain them.
+async function renderTraceStrip(anyTraced) {
+  $traceStrip.classList.toggle('hidden', !anyTraced);
+  if (!anyTraced) return;
+
+  traceIds = await ensureTraceIds();
+  paintTraceIds();
 }
 
 async function createProfileCard(profile, isActive) {
@@ -586,6 +604,10 @@ async function handleSave() {
 
 async function openEnvironments() {
   environments = await getEnvironments();
+  tracingSettings = await getTracingSettings();
+  $inputCorrelationHeader.value = tracingSettings.correlationHeader;
+  $inputAttemptHeader.value = tracingSettings.attemptHeader;
+
   $profileList.classList.add('hidden');
   setListChromeVisible(false);
   $environmentsScreen.classList.remove('hidden');
@@ -669,10 +691,13 @@ function openEnvironmentForm(environment) {
   $inputEnvTokenUrl.value = environment?.tokenUrl || '';
   $inputEnvClientSecret.value = environment?.clientSecret || '';
 
+  // Editing one environment is its own task — the rest of Settings steps aside
   $environmentForm.classList.remove('hidden');
   $environmentList.classList.add('hidden');
   $environmentsEmpty.classList.add('hidden');
   $btnAddEnvironment.classList.add('hidden');
+  $environmentsHint.classList.add('hidden');
+  $tracingSettings.classList.add('hidden');
   $inputEnvName.focus();
 }
 
@@ -681,6 +706,8 @@ function closeEnvironmentForm() {
   $environmentForm.classList.add('hidden');
   $environmentList.classList.remove('hidden');
   $btnAddEnvironment.classList.remove('hidden');
+  $environmentsHint.classList.remove('hidden');
+  $tracingSettings.classList.remove('hidden');
   $environmentsEmpty.classList.toggle('hidden', environments.length > 0);
 }
 
@@ -711,8 +738,6 @@ async function handleSaveEnvironment() {
 // ── Trace IDs Screen ──
 
 async function openTrace() {
-  tracingSettings = await getTracingSettings();
-  traceIds = await ensureTraceIds();
   if (!scratchUuid) scratchUuid = newUuid();
 
   $profileList.classList.add('hidden');
@@ -730,10 +755,11 @@ async function closeTrace() {
 
 function renderTrace() {
   $scratchUuid.textContent = scratchUuid;
-  $correlationId.textContent = traceIds.correlationId;
-  $attemptId.textContent = traceIds.attemptId;
-  $inputCorrelationHeader.value = tracingSettings.correlationHeader;
-  $inputAttemptHeader.value = tracingSettings.attemptHeader;
+}
+
+function paintTraceIds() {
+  $stripCorrelation.textContent = traceIds.correlationId;
+  $stripAttempt.textContent = traceIds.attemptId;
 }
 
 function cycleScratchUuid() {
@@ -744,17 +770,17 @@ function cycleScratchUuid() {
 // A new correlation ID begins a new trace, so the attempt starts over with it
 async function cycleCorrelationId() {
   traceIds = await setTraceIds({ correlationId: newUuid(), attemptId: newUuid() });
-  renderTrace();
+  paintTraceIds();
 }
 
 async function cycleAttemptId() {
   traceIds = await setTraceIds({ ...traceIds, attemptId: newUuid() });
-  renderTrace();
+  paintTraceIds();
 }
 
 async function useScratchAsCorrelationId() {
   traceIds = await setTraceIds({ correlationId: scratchUuid, attemptId: newUuid() });
-  renderTrace();
+  paintTraceIds();
 }
 
 async function handleSaveTracing() {
@@ -769,7 +795,8 @@ async function handleSaveTracing() {
   }
 
   tracingSettings = await saveTracingSettings({ correlationHeader, attemptHeader });
-  renderTrace();
+  $inputCorrelationHeader.value = tracingSettings.correlationHeader;
+  $inputAttemptHeader.value = tracingSettings.attemptHeader;
 
   const label = $btnSaveTracing.textContent;
   $btnSaveTracing.textContent = 'Saved';

@@ -47,8 +47,8 @@ Chrome extension (Manifest V3) that automatically injects HTTP headers into API 
 
 Most setups reuse the same handful of token endpoints, and non-production environments often share a client secret. Save each one once and link profiles to it:
 
-1. Click the **gear** icon in the popup header
-2. Click **+ New** and enter a name (e.g. `Acceptance`), the token URL, and — if the environment has one — a shared client secret
+1. Click the **gear** icon in the popup header to open Settings
+2. Under **Environments**, click **+ New** and enter a name (e.g. `Acceptance`), the token URL, and — if the environment has one — a shared client secret
 3. In any OAuth profile, pick that environment. The token URL comes from it, and so does the secret when it has one, so the profile only needs a Client ID
 
 Nothing is shipped with the extension: environments are yours, stored locally, and created after install.
@@ -61,11 +61,12 @@ Nothing is shipped with the extension: environments are yours, stored locally, a
 
 A **correlation ID** groups related calls; an **attempt ID** identifies one. Send both with any profile so you can paste the ID into your log search and find the request.
 
-1. Click the **#** icon in the popup header
-2. Set the header names once — they default to `X-Correlation-Id` and `X-Attempt-Id`; set them to whatever your organisation uses
-3. Switch on **Send tracing headers** in any profile, static or OAuth. It is off by default, so nothing changes for profiles you already have
+1. Open **Settings** (the gear) and set the header names once — they default to `X-Correlation-Id` and `X-Attempt-Id`; set them to whatever your organisation uses
+2. Switch on **Send tracing headers** in any profile, static or OAuth. It is off by default, so nothing changes for profiles you already have
 
-The same screen holds a **scratch UUID** with cycle and copy buttons — a standalone generator, unconnected to any profile — plus **Use as correlation ID**, which makes the UUID you're looking at the one that gets sent.
+The live IDs then appear under **Active on this page**, each with a copy button and a cycle button, so the value you are about to search for is one click away. The strip only shows when a profile matching the current page actually sends them.
+
+The **#** icon opens a standalone **UUID generator** — a random UUID with cycle and copy, unconnected to any profile — plus **Use as correlation ID**, which makes the UUID you're looking at the one that gets sent.
 
 **The IDs are stable until you cycle them.** That is deliberate for the correlation ID: a value that changed every request would not correlate anything. Cycle it when you want to start a new trace, cycle the attempt ID alone for a new attempt within the same trace. Cycling the correlation ID cycles the attempt ID with it. Both reset when the browser closes.
 

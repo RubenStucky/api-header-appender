@@ -719,6 +719,85 @@ input::placeholder {
   margin-bottom: 12px;
 }
 
+/* ── Settings sections ── */
+
+.settings-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.settings-section-head .settings-label {
+  margin-bottom: 0;
+}
+
+.settings-label {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+}
+
+.settings-section {
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+
+/* ── Live trace IDs on the profile list ── */
+
+.trace-strip {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px;
+  margin-bottom: 6px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.trace-strip-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.trace-strip-label {
+  flex-shrink: 0;
+  width: 52px;
+  font-size: 9px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  color: var(--text-muted);
+}
+
+.trace-strip-value {
+  flex: 1;
+  min-width: 0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  user-select: all;
+}
+
+.trace-strip .btn-icon {
+  width: 22px;
+  height: 22px;
+}
+
+.trace-strip .btn-icon svg {
+  width: 12px;
+  height: 12px;
+}
+
 /* ── Trace IDs ── */
 
 .trace-screen {
@@ -768,6 +847,8 @@ input::placeholder {
   align-items: center;
   justify-content: space-between;
   gap: 8px;
+  /* Set apart from the type toggle above it rather than reading as part of it */
+  margin-top: 14px;
 }
 
 .switch-label {
