@@ -305,11 +305,11 @@ html, body {
 .profile-form h2 {
   font-size: 14px;
   font-weight: 600;
-  margin-bottom: 12px;
+  margin-bottom: 10px;
 }
 
 .form-group {
-  margin-bottom: 10px;
+  margin-bottom: 8px;
 }
 
 .form-group label {

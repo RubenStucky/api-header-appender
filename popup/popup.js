@@ -193,6 +193,13 @@ async function detectCurrentTab() {
   }
 }
 
+// The tab indicator and header buttons belong to the list; sub-screens reclaim
+// their vertical space so a form fits in one view without scrolling.
+function setListChromeVisible(visible) {
+  $headerActions.classList.toggle('hidden', !visible);
+  $currentTab.classList.toggle('hidden', !visible || !currentTabUrl);
+}
+
 // ── Profile Rendering ──
 
 async function renderProfiles() {
@@ -382,7 +389,7 @@ async function createProfileCard(profile, isActive) {
 
 function openForm(profile, prefillDomain = '') {
   $profileList.classList.add('hidden');
-  $headerActions.classList.add('hidden');
+  setListChromeVisible(false);
   $profileForm.classList.remove('hidden');
 
   populateEnvironmentSelect(profile?.environmentId || '');
@@ -428,7 +435,7 @@ function openForm(profile, prefillDomain = '') {
 function closeForm() {
   $profileForm.classList.add('hidden');
   $profileList.classList.remove('hidden');
-  $headerActions.classList.remove('hidden');
+  setListChromeVisible(true);
   editingProfileId = null;
 }
 
@@ -580,7 +587,7 @@ async function handleSave() {
 async function openEnvironments() {
   environments = await getEnvironments();
   $profileList.classList.add('hidden');
-  $headerActions.classList.add('hidden');
+  setListChromeVisible(false);
   $environmentsScreen.classList.remove('hidden');
   closeEnvironmentForm();
   renderEnvironments();
@@ -589,7 +596,7 @@ async function openEnvironments() {
 async function closeEnvironments() {
   $environmentsScreen.classList.add('hidden');
   $profileList.classList.remove('hidden');
-  $headerActions.classList.remove('hidden');
+  setListChromeVisible(true);
   await renderProfiles();
 }
 
@@ -709,7 +716,7 @@ async function openTrace() {
   if (!scratchUuid) scratchUuid = newUuid();
 
   $profileList.classList.add('hidden');
-  $headerActions.classList.add('hidden');
+  setListChromeVisible(false);
   $traceScreen.classList.remove('hidden');
   renderTrace();
 }
@@ -717,7 +724,7 @@ async function openTrace() {
 async function closeTrace() {
   $traceScreen.classList.add('hidden');
   $profileList.classList.remove('hidden');
-  $headerActions.classList.remove('hidden');
+  setListChromeVisible(true);
   await renderProfiles();
 }
 
