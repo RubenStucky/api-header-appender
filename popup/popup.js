@@ -3,6 +3,12 @@ import {
   saveProfile,
   deleteProfile,
   createEmptyProfile,
+  getEnvironments,
+  saveEnvironment,
+  deleteEnvironment,
+  createEmptyEnvironment,
+  findEnvironment,
+  resolveOAuthConfig,
   getCachedToken,
   domainMatchesUrl,
 } from '../lib/storage.js';
@@ -38,21 +44,48 @@ const $inputTokenUrl = document.getElementById('input-token-url');
 const $inputClientId = document.getElementById('input-client-id');
 const $inputClientSecret = document.getElementById('input-client-secret');
 
+const $selectEnvironment = document.getElementById('select-environment');
+const $groupTokenUrl = document.getElementById('group-token-url');
+const $groupEnvTokenUrl = document.getElementById('group-env-token-url');
+const $envTokenUrlDisplay = document.getElementById('env-token-url-display');
+const $groupClientSecret = document.getElementById('group-client-secret');
+const $groupEnvClientSecret = document.getElementById('group-env-client-secret');
+const $envSecretSource = document.getElementById('env-secret-source');
+const $clientSecretHint = document.getElementById('client-secret-hint');
+
+const $headerActions = document.querySelector('.header-actions');
 const $btnAdd = document.getElementById('btn-add');
 const $btnAddHeader = document.getElementById('btn-add-header');
 const $btnSave = document.getElementById('btn-save');
 const $btnCancel = document.getElementById('btn-cancel');
+
+const $btnEnvironments = document.getElementById('btn-environments');
+const $environmentsScreen = document.getElementById('environments-screen');
+const $btnEnvironmentsBack = document.getElementById('btn-environments-back');
+const $btnAddEnvironment = document.getElementById('btn-add-environment');
+const $environmentList = document.getElementById('environment-list');
+const $environmentsEmpty = document.getElementById('environments-empty');
+const $environmentForm = document.getElementById('environment-form');
+const $environmentFormTitle = document.getElementById('environment-form-title');
+const $inputEnvName = document.getElementById('input-env-name');
+const $inputEnvTokenUrl = document.getElementById('input-env-token-url');
+const $inputEnvClientSecret = document.getElementById('input-env-client-secret');
+const $btnSaveEnvironment = document.getElementById('btn-save-environment');
+const $btnCancelEnvironment = document.getElementById('btn-cancel-environment');
 
 // ── State ──
 
 let currentTabUrl = '';
 let editingProfileId = null;
 let currentType = 'static';
+let environments = [];
+let editingEnvironmentId = null;
 
 // ── Init ──
 
 document.addEventListener('DOMContentLoaded', async () => {
   await detectCurrentTab();
+  environments = await getEnvironments();
   await renderProfiles();
   bindEvents();
 });
@@ -81,6 +114,14 @@ function bindEvents() {
 
   $toggleStatic.addEventListener('click', () => setType('static'));
   $toggleOAuth.addEventListener('click', () => setType('oauth'));
+
+  $selectEnvironment.addEventListener('change', applyEnvironmentSelection);
+
+  $btnEnvironments.addEventListener('click', openEnvironments);
+  $btnEnvironmentsBack.addEventListener('click', closeEnvironments);
+  $btnAddEnvironment.addEventListener('click', () => openEnvironmentForm(null));
+  $btnSaveEnvironment.addEventListener('click', handleSaveEnvironment);
+  $btnCancelEnvironment.addEventListener('click', closeEnvironmentForm);
 
   $toggleAllProfiles.addEventListener('click', () => {
     const collapsed = $allProfilesWrapper.classList.toggle('collapsed');
@@ -183,11 +224,19 @@ async function createProfileCard(profile, isActive) {
 
   // Build status text for OAuth profiles
   let statusHtml = '';
+  let environmentBadge = '';
   if (profile.type === 'oauth') {
+    const config = resolveOAuthConfig(profile, environments);
     const token = await getCachedToken(profile.id).catch(() => null);
     const error = await getTokenError(profile.id);
 
-    if (error) {
+    if (config.environmentName) {
+      environmentBadge = `<span class="profile-badge env">${escapeHtml(config.environmentName)}</span>`;
+    }
+
+    if (config.error) {
+      statusHtml = `<div class="profile-status error">✗ ${escapeHtml(config.error)}</div>`;
+    } else if (error) {
       statusHtml = `<div class="profile-status error">✗ ${escapeHtml(error.message).slice(0, 60)}</div>`;
     } else if (token) {
       const remaining = token.expiresAt ? Math.round((token.expiresAt - Date.now()) / 1000) : null;
@@ -208,6 +257,7 @@ async function createProfileCard(profile, isActive) {
       <div class="profile-name">
         ${escapeHtml(profile.name || 'Unnamed')}
         <span class="profile-badge ${profile.type === 'oauth' ? 'oauth' : ''}">${profile.type === 'oauth' ? 'OAuth' : 'Static'}</span>
+        ${environmentBadge}
       </div>
       <div class="profile-url">${escapeHtml(profile.urlPattern || '—')}</div>
       ${statusHtml}
@@ -292,8 +342,10 @@ async function createProfileCard(profile, isActive) {
 
 function openForm(profile, prefillDomain = '') {
   $profileList.classList.add('hidden');
-  $btnAdd.classList.add('hidden');
+  $headerActions.classList.add('hidden');
   $profileForm.classList.remove('hidden');
+
+  populateEnvironmentSelect(profile?.environmentId || '');
 
   if (profile) {
     editingProfileId = profile.id;
@@ -327,13 +379,14 @@ function openForm(profile, prefillDomain = '') {
     $inputClientSecret.value = '';
   }
 
+  applyEnvironmentSelection();
   $inputName.focus();
 }
 
 function closeForm() {
   $profileForm.classList.add('hidden');
   $profileList.classList.remove('hidden');
-  $btnAdd.classList.remove('hidden');
+  $headerActions.classList.remove('hidden');
   editingProfileId = null;
 }
 
@@ -343,6 +396,55 @@ function setType(type) {
   $toggleOAuth.classList.toggle('active', type === 'oauth');
   $sectionStatic.classList.toggle('hidden', type !== 'static');
   $sectionOAuth.classList.toggle('hidden', type !== 'oauth');
+}
+
+// ── Environment Selection (profile form) ──
+
+function populateEnvironmentSelect(selectedId) {
+  $selectEnvironment.innerHTML = '';
+
+  const custom = document.createElement('option');
+  custom.value = '';
+  custom.textContent = 'Custom (enter manually)';
+  $selectEnvironment.appendChild(custom);
+
+  for (const environment of environments) {
+    const option = document.createElement('option');
+    option.value = environment.id;
+    option.textContent = environment.name || 'Unnamed';
+    $selectEnvironment.appendChild(option);
+  }
+
+  // A profile can still point at an environment that has since been deleted
+  if (selectedId && !findEnvironment(environments, selectedId)) {
+    const missing = document.createElement('option');
+    missing.value = selectedId;
+    missing.textContent = '⚠ Deleted environment';
+    $selectEnvironment.appendChild(missing);
+  }
+
+  $selectEnvironment.value = selectedId;
+}
+
+function applyEnvironmentSelection() {
+  const linked = Boolean($selectEnvironment.value);
+  const environment = findEnvironment(environments, $selectEnvironment.value);
+
+  $groupTokenUrl.classList.toggle('hidden', linked);
+  $groupEnvTokenUrl.classList.toggle('hidden', !linked);
+  if (environment) {
+    $envTokenUrlDisplay.textContent = environment.tokenUrl || '—';
+  } else if (linked) {
+    $envTokenUrlDisplay.textContent = 'Environment no longer exists — pick another';
+  }
+
+  const secretFromEnvironment = Boolean(environment?.clientSecret);
+  $groupClientSecret.classList.toggle('hidden', secretFromEnvironment);
+  $groupEnvClientSecret.classList.toggle('hidden', !secretFromEnvironment);
+  $clientSecretHint.classList.toggle('hidden', !linked || secretFromEnvironment);
+  if (secretFromEnvironment) {
+    $envSecretSource.textContent = environment.name || 'environment';
+  }
 }
 
 function addHeaderRow(name, value) {
@@ -397,12 +499,30 @@ async function handleSave() {
       profile.headers = [{ name: '', value: '' }];
     }
   } else {
-    profile.tokenUrl = $inputTokenUrl.value.trim();
-    profile.clientId = $inputClientId.value.trim();
-    profile.clientSecret = $inputClientSecret.value.trim();
+    const environmentId = $selectEnvironment.value || null;
+    const environment = findEnvironment(environments, environmentId);
 
-    if (!profile.tokenUrl || !profile.clientId || !profile.clientSecret) {
-      alert('Token URL, Client ID, and Client Secret are required for OAuth profiles.');
+    if (environmentId && !environment) {
+      alert('This profile points at an environment that no longer exists. Pick another one.');
+      return;
+    }
+
+    profile.environmentId = environmentId;
+    profile.clientId = $inputClientId.value.trim();
+    // A linked profile stores nothing its environment already provides
+    profile.tokenUrl = environment ? '' : $inputTokenUrl.value.trim();
+    profile.clientSecret = environment?.clientSecret ? '' : $inputClientSecret.value.trim();
+
+    if (!profile.clientId) {
+      alert('Client ID is required for OAuth profiles.');
+      return;
+    }
+    if (!environment && !profile.tokenUrl) {
+      alert('Token URL is required for OAuth profiles.');
+      return;
+    }
+    if (!environment?.clientSecret && !profile.clientSecret) {
+      alert('Client Secret is required for OAuth profiles.');
       return;
     }
   }
@@ -410,6 +530,132 @@ async function handleSave() {
   await saveProfile(profile);
   closeForm();
   await renderProfiles();
+}
+
+// ── Environments Screen ──
+
+async function openEnvironments() {
+  environments = await getEnvironments();
+  $profileList.classList.add('hidden');
+  $headerActions.classList.add('hidden');
+  $environmentsScreen.classList.remove('hidden');
+  closeEnvironmentForm();
+  renderEnvironments();
+}
+
+async function closeEnvironments() {
+  $environmentsScreen.classList.add('hidden');
+  $profileList.classList.remove('hidden');
+  $headerActions.classList.remove('hidden');
+  await renderProfiles();
+}
+
+function renderEnvironments() {
+  $environmentList.innerHTML = '';
+  $environmentsEmpty.classList.toggle('hidden', environments.length > 0);
+
+  for (const environment of environments) {
+    $environmentList.appendChild(createEnvironmentCard(environment));
+  }
+}
+
+function createEnvironmentCard(environment) {
+  const card = document.createElement('div');
+  card.className = 'environment-card';
+
+  card.innerHTML = `
+    <div class="environment-info">
+      <div class="environment-name">${escapeHtml(environment.name || 'Unnamed')}</div>
+      <div class="environment-url">${escapeHtml(environment.tokenUrl || '—')}</div>
+      <div class="environment-secret ${environment.clientSecret ? 'has-secret' : ''}">${environment.clientSecret ? '● Secret saved' : '○ No shared secret'}</div>
+      <div class="environment-warning hidden"></div>
+    </div>
+    <div class="profile-actions">
+      <button class="btn-icon settings" data-action="edit" title="Edit"><svg viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg></button>
+      <button class="btn-icon" data-action="delete" title="Delete"><svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+    </div>
+  `;
+
+  card.querySelector('.environment-info').addEventListener('click', () => openEnvironmentForm(environment));
+  card.querySelector('[data-action="edit"]').addEventListener('click', () => openEnvironmentForm(environment));
+
+  const deleteBtn = card.querySelector('[data-action="delete"]');
+  const warning = card.querySelector('.environment-warning');
+
+  deleteBtn.addEventListener('click', async () => {
+    if (deleteBtn.classList.contains('confirm-delete')) {
+      await deleteEnvironment(environment.id);
+      environments = await getEnvironments();
+      renderEnvironments();
+      return;
+    }
+
+    // First click arms the delete and names whatever would break
+    const profiles = await getProfiles();
+    const linked = profiles.filter(p => p.environmentId === environment.id);
+    if (linked.length > 0) {
+      warning.textContent = `Used by ${linked.map(p => p.name || 'Unnamed').join(', ')} — they will stop working until repointed.`;
+      warning.classList.remove('hidden');
+    }
+
+    deleteBtn.classList.add('confirm-delete');
+    deleteBtn.innerHTML = `<svg viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg><span class="confirm-label">Confirm delete</span>`;
+
+    setTimeout(() => {
+      if (!deleteBtn.classList.contains('confirm-delete')) return;
+      deleteBtn.classList.remove('confirm-delete');
+      deleteBtn.innerHTML = `<svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>`;
+      warning.classList.add('hidden');
+    }, 3000);
+  });
+
+  return card;
+}
+
+function openEnvironmentForm(environment) {
+  editingEnvironmentId = environment?.id || null;
+  $environmentFormTitle.textContent = environment ? 'Edit Environment' : 'New Environment';
+  $inputEnvName.value = environment?.name || '';
+  $inputEnvTokenUrl.value = environment?.tokenUrl || '';
+  $inputEnvClientSecret.value = environment?.clientSecret || '';
+
+  $environmentForm.classList.remove('hidden');
+  $environmentList.classList.add('hidden');
+  $environmentsEmpty.classList.add('hidden');
+  $btnAddEnvironment.classList.add('hidden');
+  $inputEnvName.focus();
+}
+
+function closeEnvironmentForm() {
+  editingEnvironmentId = null;
+  $environmentForm.classList.add('hidden');
+  $environmentList.classList.remove('hidden');
+  $btnAddEnvironment.classList.remove('hidden');
+  $environmentsEmpty.classList.toggle('hidden', environments.length > 0);
+}
+
+async function handleSaveEnvironment() {
+  const name = $inputEnvName.value.trim();
+  const tokenUrl = $inputEnvTokenUrl.value.trim();
+
+  if (!name || !tokenUrl) {
+    alert('Name and Token URL are required.');
+    return;
+  }
+
+  const environment = editingEnvironmentId
+    ? findEnvironment(environments, editingEnvironmentId) || createEmptyEnvironment()
+    : createEmptyEnvironment();
+  if (editingEnvironmentId) environment.id = editingEnvironmentId;
+
+  environment.name = name;
+  environment.tokenUrl = tokenUrl;
+  environment.clientSecret = $inputEnvClientSecret.value.trim();
+
+  await saveEnvironment(environment);
+  environments = await getEnvironments();
+  closeEnvironmentForm();
+  renderEnvironments();
 }
 
 // ── Helpers ──

@@ -10,7 +10,10 @@
   <div class="container">
     <header class="header">
       <h1>API Header Appender</h1>
-      <button id="btn-add" class="btn btn-primary btn-sm" title="Add profile">+ Add</button>
+      <div class="header-actions">
+        <button id="btn-environments" class="btn-icon settings" title="Manage environments"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></button>
+        <button id="btn-add" class="btn btn-primary btn-sm" title="Add profile">+ Add</button>
+      </div>
     </header>
 
     <!-- Current tab info -->
@@ -85,22 +88,79 @@
       <!-- OAuth section -->
       <div id="section-oauth" class="section-fields hidden">
         <div class="form-group">
+          <label for="select-environment">Environment</label>
+          <select id="select-environment" class="select-input"></select>
+        </div>
+        <div class="form-group" id="group-token-url">
           <label for="input-token-url">Token URL</label>
           <input type="text" id="input-token-url" placeholder="https://auth.example.com/connect/token">
+        </div>
+        <div class="form-group hidden" id="group-env-token-url">
+          <label>Token URL</label>
+          <div class="readonly-value" id="env-token-url-display">—</div>
         </div>
         <div class="form-group">
           <label for="input-client-id">Client ID</label>
           <input type="text" id="input-client-id" placeholder="client_id">
         </div>
-        <div class="form-group">
+        <div class="form-group" id="group-client-secret">
           <label for="input-client-secret">Client Secret</label>
           <input type="password" id="input-client-secret" placeholder="client_secret">
+          <span class="hint hidden" id="client-secret-hint">This environment has no shared secret, so enter this profile's own.</span>
+        </div>
+        <div class="form-group hidden" id="group-env-client-secret">
+          <label>Client Secret</label>
+          <div class="readonly-value">● from <span id="env-secret-source"></span></div>
         </div>
       </div>
 
       <div class="form-actions">
         <button id="btn-save" class="btn btn-primary">Save</button>
         <button id="btn-cancel" class="btn btn-ghost">Cancel</button>
+      </div>
+    </div>
+
+    <!-- Environments screen (hidden by default) -->
+    <div id="environments-screen" class="environments-screen hidden">
+      <div class="screen-header">
+        <button id="btn-environments-back" class="btn-link">← Back</button>
+        <button id="btn-add-environment" class="btn btn-primary btn-sm">+ New</button>
+      </div>
+
+      <h2>Environments</h2>
+      <p class="screen-hint">Reusable OAuth token endpoints. Link a profile to one instead of retyping its URL and secret.</p>
+
+      <div id="environment-list" class="environment-list"></div>
+
+      <div id="environments-empty" class="empty-state hidden">
+        <p>No environments yet.</p>
+        <p class="muted">Click <strong>+ New</strong> to add one.</p>
+      </div>
+
+      <!-- Environment edit form -->
+      <div id="environment-form" class="environment-form hidden">
+        <h3 id="environment-form-title">New Environment</h3>
+
+        <div class="form-group">
+          <label for="input-env-name">Name</label>
+          <input type="text" id="input-env-name" placeholder="e.g. Acceptance">
+        </div>
+
+        <div class="form-group">
+          <label for="input-env-token-url">Token URL</label>
+          <input type="text" id="input-env-token-url" placeholder="https://auth.example.com/connect/token">
+        </div>
+
+        <div class="form-group">
+          <label for="input-env-client-secret">Client Secret <span class="label-optional">optional</span></label>
+          <input type="password" id="input-env-client-secret" placeholder="Shared secret, if any">
+          <span class="hint">Leave empty when each profile has its own secret.</span>
+        </div>
+
+        <div class="form-actions">
+          <button id="btn-save-environment" class="btn btn-primary">Save</button>
+          <button id="btn-cancel-environment" class="btn btn-ghost">Cancel</button>
+        </div>
       </div>
     </div>
   </div>
