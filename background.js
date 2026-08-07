@@ -7,6 +7,9 @@ import {
   clearCachedToken,
   getRuleIdsForProfile,
   getOAuthRuleId,
+  getTracingRuleId,
+  getTracingSettings,
+  ensureTraceIds,
   domainToUrlFilter,
 } from './lib/storage.js';
 
@@ -32,10 +35,22 @@ chrome.runtime.onStartup.addListener(() => {
 
 // Re-sync rules whenever profiles are modified (e.g. from popup)
 chrome.storage.onChanged.addListener((changes, area) => {
+  // Cycling a trace ID has to reach the rules straight away
+  if (area === 'session' && changes.traceIds) {
+    console.log('[API Header Appender] Trace IDs changed, syncing rules');
+    syncAllRules();
+    return;
+  }
+
   if (area !== 'local') return;
 
   if (changes.profiles) {
     console.log('[API Header Appender] Profiles changed, syncing rules');
+    syncAllRules();
+  }
+
+  if (changes.tracing) {
+    console.log('[API Header Appender] Tracing header names changed, syncing rules');
     syncAllRules();
   }
 
@@ -102,6 +117,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
 async function syncAllRules() {
   const profiles = await getProfiles();
+  const tracingSettings = await getTracingSettings();
+  const traceIds = profiles.some(p => p.enabled && p.tracing) ? await ensureTraceIds() : null;
 
   // Collect all rule IDs we want to set, and remove everything else
   const dynamicRules = [];
@@ -172,19 +189,30 @@ async function syncAllRules() {
         });
       }
     }
+
+    // Tracing rides alongside whatever the profile already sets, as its own session rule
+    if (profile.tracing && traceIds) {
+      const requestHeaders = buildTracingHeaders(tracingSettings, traceIds);
+      if (requestHeaders.length > 0) {
+        sessionRules.push({
+          id: getTracingRuleId(i),
+          priority: 1,
+          action: { type: 'modifyHeaders', requestHeaders },
+          condition: {
+            urlFilter: domainToUrlFilter(profile.urlPattern),
+            resourceTypes: RESOURCE_TYPES,
+          },
+        });
+      }
+    }
   }
 
-  // Apply rules atomically
-  try {
-    await chrome.declarativeNetRequest.updateDynamicRules({
-      removeRuleIds: dynamicRemoveIds,
-      addRules: dynamicRules,
-    });
-    console.log(`[API Header Appender] Applied ${dynamicRules.length} dynamic rules`);
-  } catch (err) {
-    console.error('[API Header Appender] Failed to update dynamic rules:', err);
-  }
-
+  // Apply rules atomically.
+  // Session rules go first: Chrome runs both APIs through one FIFO queue per extension,
+  // and updateDynamicRules writes two files on the file sequence before it returns, so
+  // updating it first would hold up the volatile rules (tokens, trace IDs) behind disk
+  // I/O. Session rules install their matcher synchronously instead. Dynamic rules survive
+  // a restart anyway, so they are already in place when it matters.
   try {
     await chrome.declarativeNetRequest.updateSessionRules({
       removeRuleIds: sessionRemoveIds,
@@ -195,11 +223,45 @@ async function syncAllRules() {
     console.error('[API Header Appender] Failed to update session rules:', err);
   }
 
+  try {
+    await chrome.declarativeNetRequest.updateDynamicRules({
+      removeRuleIds: dynamicRemoveIds,
+      addRules: dynamicRules,
+    });
+    console.log(`[API Header Appender] Applied ${dynamicRules.length} dynamic rules`);
+  } catch (err) {
+    console.error('[API Header Appender] Failed to update dynamic rules:', err);
+  }
+
   // Update badge for current tab
   try {
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
     if (tab) await updateIcon(tab);
   } catch { /* ignore */ }
+}
+
+// Custom header names must use 'set': DNR's 'append' operation only accepts an
+// allowlist of standard headers, which excludes X- and vendor-prefixed names.
+function buildTracingHeaders(settings, traceIds) {
+  const headers = [];
+
+  if (settings.correlationHeader) {
+    headers.push({
+      header: settings.correlationHeader,
+      operation: 'set',
+      value: traceIds.correlationId,
+    });
+  }
+
+  if (settings.attemptHeader) {
+    headers.push({
+      header: settings.attemptHeader,
+      operation: 'set',
+      value: traceIds.attemptId,
+    });
+  }
+
+  return headers;
 }
 
 // ── OAuth Token Fetching ──

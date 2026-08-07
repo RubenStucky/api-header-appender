@@ -9,6 +9,13 @@ import {
   createEmptyEnvironment,
   findEnvironment,
   resolveOAuthConfig,
+  getTracingSettings,
+  saveTracingSettings,
+  isValidHeaderName,
+  ensureTraceIds,
+  setTraceIds,
+  newUuid,
+  DEFAULT_TRACING_SETTINGS,
   getCachedToken,
   domainMatchesUrl,
 } from '../lib/storage.js';
@@ -73,6 +80,24 @@ const $inputEnvClientSecret = document.getElementById('input-env-client-secret')
 const $btnSaveEnvironment = document.getElementById('btn-save-environment');
 const $btnCancelEnvironment = document.getElementById('btn-cancel-environment');
 
+const $inputTracing = document.getElementById('input-tracing');
+const $btnTrace = document.getElementById('btn-trace');
+const $traceScreen = document.getElementById('trace-screen');
+const $btnTraceBack = document.getElementById('btn-trace-back');
+const $scratchUuid = document.getElementById('scratch-uuid');
+const $btnCycleScratch = document.getElementById('btn-cycle-scratch');
+const $btnCopyScratch = document.getElementById('btn-copy-scratch');
+const $btnUseScratch = document.getElementById('btn-use-scratch');
+const $correlationId = document.getElementById('correlation-id');
+const $btnCycleCorrelation = document.getElementById('btn-cycle-correlation');
+const $btnCopyCorrelation = document.getElementById('btn-copy-correlation');
+const $attemptId = document.getElementById('attempt-id');
+const $btnCycleAttempt = document.getElementById('btn-cycle-attempt');
+const $btnCopyAttempt = document.getElementById('btn-copy-attempt');
+const $inputCorrelationHeader = document.getElementById('input-correlation-header');
+const $inputAttemptHeader = document.getElementById('input-attempt-header');
+const $btnSaveTracing = document.getElementById('btn-save-tracing');
+
 // ── State ──
 
 let currentTabUrl = '';
@@ -80,6 +105,9 @@ let editingProfileId = null;
 let currentType = 'static';
 let environments = [];
 let editingEnvironmentId = null;
+let tracingSettings = { ...DEFAULT_TRACING_SETTINGS };
+let traceIds = { correlationId: '', attemptId: '' };
+let scratchUuid = '';
 
 // ── Init ──
 
@@ -116,6 +144,17 @@ function bindEvents() {
   $toggleOAuth.addEventListener('click', () => setType('oauth'));
 
   $selectEnvironment.addEventListener('change', applyEnvironmentSelection);
+
+  $btnTrace.addEventListener('click', openTrace);
+  $btnTraceBack.addEventListener('click', closeTrace);
+  $btnCycleScratch.addEventListener('click', cycleScratchUuid);
+  $btnCopyScratch.addEventListener('click', () => copyToClipboard($btnCopyScratch, scratchUuid, $scratchUuid));
+  $btnUseScratch.addEventListener('click', useScratchAsCorrelationId);
+  $btnCycleCorrelation.addEventListener('click', cycleCorrelationId);
+  $btnCopyCorrelation.addEventListener('click', () => copyToClipboard($btnCopyCorrelation, traceIds.correlationId, $correlationId));
+  $btnCycleAttempt.addEventListener('click', cycleAttemptId);
+  $btnCopyAttempt.addEventListener('click', () => copyToClipboard($btnCopyAttempt, traceIds.attemptId, $attemptId));
+  $btnSaveTracing.addEventListener('click', handleSaveTracing);
 
   $btnEnvironments.addEventListener('click', openEnvironments);
   $btnEnvironmentsBack.addEventListener('click', closeEnvironments);
@@ -258,6 +297,7 @@ async function createProfileCard(profile, isActive) {
         ${escapeHtml(profile.name || 'Unnamed')}
         <span class="profile-badge ${profile.type === 'oauth' ? 'oauth' : ''}">${profile.type === 'oauth' ? 'OAuth' : 'Static'}</span>
         ${environmentBadge}
+        ${profile.tracing ? '<span class="profile-badge trace">trace</span>' : ''}
       </div>
       <div class="profile-url">${escapeHtml(profile.urlPattern || '—')}</div>
       ${statusHtml}
@@ -352,6 +392,7 @@ function openForm(profile, prefillDomain = '') {
     $formTitle.textContent = 'Edit Profile';
     $inputName.value = profile.name || '';
     $inputUrl.value = profile.urlPattern || '';
+    $inputTracing.checked = Boolean(profile.tracing);
     setType(profile.type || 'static');
 
     // Populate headers
@@ -371,6 +412,7 @@ function openForm(profile, prefillDomain = '') {
     $formTitle.textContent = 'Add Profile';
     $inputName.value = '';
     $inputUrl.value = prefillDomain;
+    $inputTracing.checked = false;
     setType('static');
     $headersList.innerHTML = '';
     addHeaderRow('', '');
@@ -484,6 +526,7 @@ async function handleSave() {
   profile.name = name;
   profile.urlPattern = urlPattern;
   profile.type = currentType;
+  profile.tracing = $inputTracing.checked;
 
   if (currentType === 'static') {
     profile.headers = [];
@@ -656,6 +699,101 @@ async function handleSaveEnvironment() {
   environments = await getEnvironments();
   closeEnvironmentForm();
   renderEnvironments();
+}
+
+// ── Trace IDs Screen ──
+
+async function openTrace() {
+  tracingSettings = await getTracingSettings();
+  traceIds = await ensureTraceIds();
+  if (!scratchUuid) scratchUuid = newUuid();
+
+  $profileList.classList.add('hidden');
+  $headerActions.classList.add('hidden');
+  $traceScreen.classList.remove('hidden');
+  renderTrace();
+}
+
+async function closeTrace() {
+  $traceScreen.classList.add('hidden');
+  $profileList.classList.remove('hidden');
+  $headerActions.classList.remove('hidden');
+  await renderProfiles();
+}
+
+function renderTrace() {
+  $scratchUuid.textContent = scratchUuid;
+  $correlationId.textContent = traceIds.correlationId;
+  $attemptId.textContent = traceIds.attemptId;
+  $inputCorrelationHeader.value = tracingSettings.correlationHeader;
+  $inputAttemptHeader.value = tracingSettings.attemptHeader;
+}
+
+function cycleScratchUuid() {
+  scratchUuid = newUuid();
+  renderTrace();
+}
+
+// A new correlation ID begins a new trace, so the attempt starts over with it
+async function cycleCorrelationId() {
+  traceIds = await setTraceIds({ correlationId: newUuid(), attemptId: newUuid() });
+  renderTrace();
+}
+
+async function cycleAttemptId() {
+  traceIds = await setTraceIds({ ...traceIds, attemptId: newUuid() });
+  renderTrace();
+}
+
+async function useScratchAsCorrelationId() {
+  traceIds = await setTraceIds({ correlationId: scratchUuid, attemptId: newUuid() });
+  renderTrace();
+}
+
+async function handleSaveTracing() {
+  const correlationHeader = $inputCorrelationHeader.value.trim() || DEFAULT_TRACING_SETTINGS.correlationHeader;
+  const attemptHeader = $inputAttemptHeader.value.trim() || DEFAULT_TRACING_SETTINGS.attemptHeader;
+
+  for (const name of [correlationHeader, attemptHeader]) {
+    if (!isValidHeaderName(name)) {
+      alert(`"${name}" is not a valid header name. Use letters, digits and - _ . without spaces.`);
+      return;
+    }
+  }
+
+  tracingSettings = await saveTracingSettings({ correlationHeader, attemptHeader });
+  renderTrace();
+
+  const label = $btnSaveTracing.textContent;
+  $btnSaveTracing.textContent = 'Saved';
+  $btnSaveTracing.disabled = true;
+  setTimeout(() => {
+    $btnSaveTracing.textContent = label;
+    $btnSaveTracing.disabled = false;
+  }, 1200);
+}
+
+async function copyToClipboard(button, text, valueElement) {
+  try {
+    await navigator.clipboard.writeText(text);
+  } catch {
+    // Leave the value selected so it is still one keystroke away
+    selectText(valueElement);
+    return;
+  }
+
+  const original = button.innerHTML;
+  button.innerHTML = '<svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>';
+  setTimeout(() => { button.innerHTML = original; }, 1200);
+}
+
+function selectText(element) {
+  if (!element) return;
+  const range = document.createRange();
+  range.selectNodeContents(element);
+  const selection = window.getSelection();
+  selection.removeAllRanges();
+  selection.addRange(range);
 }
 
 // ── Helpers ──

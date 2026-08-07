@@ -11,6 +11,7 @@
     <header class="header">
       <h1>API Header Appender</h1>
       <div class="header-actions">
+        <button id="btn-trace" class="btn-icon settings" title="Trace IDs"><svg viewBox="0 0 24 24"><line x1="4" y1="9" x2="20" y2="9"/><line x1="4" y1="15" x2="20" y2="15"/><line x1="10" y1="3" x2="8" y2="21"/><line x1="16" y1="3" x2="14" y2="21"/></svg></button>
         <button id="btn-environments" class="btn-icon settings" title="Manage environments"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></button>
         <button id="btn-add" class="btn btn-primary btn-sm" title="Add profile">+ Add</button>
       </div>
@@ -74,6 +75,14 @@
           <button class="toggle-btn active" data-type="static" id="toggle-static">Static Headers</button>
           <button class="toggle-btn" data-type="oauth" id="toggle-oauth">OAuth Token</button>
         </div>
+      </div>
+
+      <div class="form-group switch-group">
+        <span class="switch-label">Send tracing headers</span>
+        <label class="toggle-switch" title="Send the correlation and attempt headers">
+          <input type="checkbox" id="input-tracing">
+          <span class="toggle-slider"></span>
+        </label>
       </div>
 
       <!-- Static headers section -->
@@ -161,6 +170,60 @@
           <button id="btn-save-environment" class="btn btn-primary">Save</button>
           <button id="btn-cancel-environment" class="btn btn-ghost">Cancel</button>
         </div>
+      </div>
+    </div>
+
+    <!-- Trace IDs screen (hidden by default) -->
+    <div id="trace-screen" class="trace-screen hidden">
+      <div class="screen-header">
+        <button id="btn-trace-back" class="btn-link">← Back</button>
+      </div>
+
+      <h2>Trace IDs</h2>
+      <p class="screen-hint">Sent with every profile that has tracing switched on. They stay put until you cycle them, so you can copy one and search your logs for it.</p>
+
+      <div class="form-group">
+        <label>Scratch UUID</label>
+        <div class="uuid-row">
+          <div class="uuid-value" id="scratch-uuid">—</div>
+          <button class="btn-icon refresh" id="btn-cycle-scratch" title="Generate a new one"><svg viewBox="0 0 24 24"><path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/></svg></button>
+          <button class="btn-icon settings" id="btn-copy-scratch" title="Copy"><svg viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>
+        </div>
+        <button id="btn-use-scratch" class="btn-link">Use as correlation ID</button>
+      </div>
+
+      <div class="form-group">
+        <label>Correlation ID</label>
+        <div class="uuid-row">
+          <div class="uuid-value" id="correlation-id">—</div>
+          <button class="btn-icon refresh" id="btn-cycle-correlation" title="Start a new trace"><svg viewBox="0 0 24 24"><path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/></svg></button>
+          <button class="btn-icon settings" id="btn-copy-correlation" title="Copy"><svg viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>
+        </div>
+        <span class="hint">Cycling this also cycles the attempt ID.</span>
+      </div>
+
+      <div class="form-group">
+        <label>Attempt ID</label>
+        <div class="uuid-row">
+          <div class="uuid-value" id="attempt-id">—</div>
+          <button class="btn-icon refresh" id="btn-cycle-attempt" title="New attempt"><svg viewBox="0 0 24 24"><path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/></svg></button>
+          <button class="btn-icon settings" id="btn-copy-attempt" title="Copy"><svg viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label for="input-correlation-header">Correlation header</label>
+        <input type="text" id="input-correlation-header" placeholder="X-Correlation-Id">
+      </div>
+
+      <div class="form-group">
+        <label for="input-attempt-header">Attempt header</label>
+        <input type="text" id="input-attempt-header" placeholder="X-Attempt-Id">
+        <span class="hint">Leave a field empty to fall back to its default.</span>
+      </div>
+
+      <div class="form-actions">
+        <button id="btn-save-tracing" class="btn btn-primary">Save header names</button>
       </div>
     </div>
   </div>
