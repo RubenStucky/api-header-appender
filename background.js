@@ -1,5 +1,7 @@
 import {
   getProfiles,
+  getEnvironments,
+  resolveOAuthConfig,
   getCachedToken,
   setCachedToken,
   clearCachedToken,
@@ -30,9 +32,18 @@ chrome.runtime.onStartup.addListener(() => {
 
 // Re-sync rules whenever profiles are modified (e.g. from popup)
 chrome.storage.onChanged.addListener((changes, area) => {
-  if (area === 'local' && changes.profiles) {
+  if (area !== 'local') return;
+
+  if (changes.profiles) {
     console.log('[API Header Appender] Profiles changed, syncing rules');
     syncAllRules();
+  }
+
+  if (changes.environments) {
+    handleEnvironmentsChanged(
+      changes.environments.oldValue || [],
+      changes.environments.newValue || [],
+    );
   }
 });
 
@@ -194,20 +205,30 @@ async function syncAllRules() {
 // ── OAuth Token Fetching ──
 
 async function fetchOAuthToken(profile) {
-  if (!profile.tokenUrl || !profile.clientId || !profile.clientSecret) {
+  const environments = await getEnvironments();
+  const config = resolveOAuthConfig(profile, environments);
+
+  if (config.error) {
+    console.warn(`[API Header Appender] OAuth profile "${profile.name}": ${config.error}`);
+    await setTokenError(profile.id, config.error);
+    return null;
+  }
+
+  if (!config.tokenUrl || !config.clientId || !config.clientSecret) {
     console.warn(`[API Header Appender] OAuth profile "${profile.name}" missing credentials`);
+    await setTokenError(profile.id, 'Missing token URL, client ID, or client secret');
     return null;
   }
 
   try {
-    console.log(`[API Header Appender] Fetching token from ${profile.tokenUrl}`);
-    const response = await fetch(profile.tokenUrl, {
+    console.log(`[API Header Appender] Fetching token from ${config.tokenUrl}`);
+    const response = await fetch(config.tokenUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({
         grant_type: 'client_credentials',
-        client_id: profile.clientId,
-        client_secret: profile.clientSecret,
+        client_id: config.clientId,
+        client_secret: config.clientSecret,
       }),
     });
 
@@ -297,6 +318,39 @@ async function handleClearToken(profileId) {
   // Re-sync to remove the session rule
   await syncAllRules();
   return { ok: true };
+}
+
+// ── Environment Changes ──
+// Editing an environment changes where linked profiles authenticate, so their cached
+// tokens are dropped rather than left to ride out their expiry against the old endpoint.
+
+async function handleEnvironmentsChanged(oldEnvironments, newEnvironments) {
+  const changedIds = new Set();
+  for (const previous of oldEnvironments) {
+    const current = newEnvironments.find(e => e.id === previous.id);
+    const credentialsChanged = !current
+      || current.tokenUrl !== previous.tokenUrl
+      || current.clientSecret !== previous.clientSecret;
+    if (credentialsChanged) changedIds.add(previous.id);
+  }
+
+  if (changedIds.size === 0) return;
+
+  const profiles = await getProfiles();
+  let invalidated = 0;
+
+  for (const profile of profiles) {
+    if (profile.type !== 'oauth' || !changedIds.has(profile.environmentId)) continue;
+    await clearCachedToken(profile.id);
+    await clearTokenError(profile.id);
+    await chrome.alarms.clear(ALARM_PREFIX + profile.id);
+    invalidated++;
+  }
+
+  if (invalidated > 0) {
+    console.log(`[API Header Appender] Environments changed, invalidated ${invalidated} token(s)`);
+    await syncAllRules();
+  }
 }
 
 // ── Token Refresh Scheduling ──
