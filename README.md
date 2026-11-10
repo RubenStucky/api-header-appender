@@ -1,6 +1,6 @@
 # API Header Appender
 
-Chrome extension (Manifest V3) that automatically injects HTTP headers into API requests based on URL patterns. Like ModHeader, but with automatic per-domain switching and built-in OAuth client credentials support.
+Chrome and Firefox extension (Manifest V3) that automatically injects HTTP headers into API requests based on URL patterns. Like ModHeader, but with automatic per-domain switching and built-in OAuth client credentials support.
 
 <img width="512" height="277" alt="image" src="https://github.com/user-attachments/assets/f483ebac-e960-447d-844d-34473838cdb8" />
 <img width="510" height="274" alt="image" src="https://github.com/user-attachments/assets/76750a03-3def-46e2-923f-15548f1d8f7b" />
@@ -22,6 +22,18 @@ Chrome extension (Manifest V3) that automatically injects HTTP headers into API 
 3. Enable **Developer mode** (toggle in top-right)
 4. Click **Load unpacked** and select the `api-header-appender` folder
 5. The extension icon appears in the toolbar
+
+### Firefox
+
+Firefox 140 or newer. The code is shared with Chrome; only the manifest differs (`manifest.firefox.json`: an event page instead of a service worker, plus a Gecko add-on ID).
+
+1. Run `./scripts/build-firefox.sh` — it assembles `dist/firefox/` and `dist/api-header-appender-firefox.zip`
+2. Open `about:debugging#/runtime/this-firefox` and click **Load Temporary Add-on…**
+3. Select `dist/firefox/manifest.json`
+
+A temporary add-on is removed when Firefox closes. To install it permanently, sign the zip through [addons.mozilla.org](https://addons.mozilla.org/developers/) (it can be signed as unlisted, for self-distribution).
+
+If headers are not applied, check that the extension still has access to all sites: `about:addons` → API Header Appender → **Permissions**. Firefox lets you revoke host access, and without it `declarativeNetRequest` cannot modify headers.
 
 ## Usage
 
@@ -96,7 +108,10 @@ One caveat shared with OAuth tokens: tracing rules are session rules, rebuilt wh
 
 ```
 api-header-appender/
-├── manifest.json          # Extension manifest (MV3)
+├── manifest.json          # Chrome manifest (MV3)
+├── manifest.firefox.json  # Firefox manifest (MV3, event page)
+├── scripts/
+│   └── build-firefox.sh   # Assembles the Firefox build in dist/
 ├── background.js          # Service worker: DNR rules, OAuth, alarms
 ├── lib/
 │   └── storage.js         # Profile & environment CRUD, credential resolution, token cache
@@ -149,6 +164,6 @@ All data is stored locally on your machine within Chrome's extension storage. No
    cd api-header-appender
    git pull
    ```
-2. Open `chrome://extensions/`
+2. Open `chrome://extensions/` (Firefox: rerun `./scripts/build-firefox.sh` and click **Reload** in `about:debugging`)
 3. Click the **refresh button** (↻) on the API Header Appender card
 4. Done — your profiles and static headers are preserved. OAuth tokens will be re-fetched automatically when you next visit a matching domain
